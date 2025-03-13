@@ -1,0 +1,196 @@
+
+
+
+import * as THREE from 'three';
+
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
+import * as dat from 'dat.gui';
+
+import { HeartCurve } from 'three/examples/jsm/curves/CurveExtras.js';
+
+import { useRef, useEffect } from 'react';
+import { SceneManager } from '../../../type';
+
+
+const Test = () => {
+
+  const mountRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+
+    if (!mountRef.current) {
+      return;
+    }
+
+    // 使用类型断言确保初始化时所有必需属性都存在
+    const sceneManager = {
+      scene: null as unknown as THREE.Scene,
+      PCamera: null as unknown as THREE.PerspectiveCamera,
+      WCamera: null as unknown as THREE.PerspectiveCamera,
+      camera: null as unknown as THREE.PerspectiveCamera,
+      renderer: null as unknown as THREE.WebGLRenderer,
+      controls: null as unknown as OrbitControls,
+      heartCurve: null as unknown as HeartCurve,
+      points: [] as THREE.Vector3[],
+      sphereMesh: null as unknown as THREE.Mesh,
+      cameraHelper: null as unknown as THREE.CameraHelper,
+      gui: null as unknown as dat.GUI,
+      currentCameraIndex: 0,
+      animationCount: 0,
+
+      createScene() {
+        this.scene = new THREE.Scene();
+      },
+
+      createCamera() {
+        const aspect = window.innerWidth / window.innerHeight;
+
+        this.PCamera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+        this.PCamera.position.set(0, 0, 10);
+        this.scene.add(this.PCamera);
+
+        this.WCamera = new THREE.PerspectiveCamera(75, aspect, 0.1, 100);
+        this.WCamera.position.set(0, 0, 20);
+        this.WCamera.lookAt(0, 0, 0);
+        this.scene.add(this.WCamera);
+
+        this.camera = this.PCamera;
+      },
+
+      createGeometry() {
+
+
+        const planeGeometry = new THREE.PlaneGeometry(2, 2);
+
+        const material = new THREE.MeshBasicMaterial({
+          color: 0x00ff00,
+          side: THREE.DoubleSide,
+        })
+
+        const planeMesh = new THREE.Mesh(planeGeometry, material);
+
+
+        planeMesh.position.set(-2, 0, 0);
+
+        // 创建一个立方体
+        const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+
+        const cubeMesh = new THREE.Mesh(cubeGeometry, material);
+
+        cubeMesh.position.set(0, 0, 0);
+        // 圆锥
+
+        const coneGeometry = new THREE.ConeGeometry(1, 2, 32);
+
+        const coneMesh = new THREE.Mesh(coneGeometry, material);
+
+        coneMesh.position.set(2, 0, 0);
+
+        // 圆柱
+
+        const cylinderGeometry = new THREE.CylinderGeometry(1, 1, 1);
+
+        const cylinderMesh = new THREE.Mesh(cylinderGeometry, material);
+
+        cylinderMesh.position.set(4, 0, 0);
+        
+        
+
+        // 加入场景
+
+        this.scene.add(planeMesh, cubeMesh, coneMesh, cylinderMesh);
+        
+        
+        
+      },
+
+      createLight() {
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(1, 1, 1);
+        const ambLight = new THREE.AmbientLight(0xffffff);
+        this.scene.add(dirLight, ambLight);
+      },
+
+
+
+
+
+      createRenderer() {
+        this.renderer = new THREE.WebGLRenderer({
+          antialias: true,
+        });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        mountRef.current?.appendChild(this.renderer.domElement);
+      },
+
+
+
+      handleResize() {
+        const handleResize = () => {
+          const width = window.innerWidth;
+          const height = window.innerHeight;
+
+          this.camera.aspect = width / height;
+          this.camera.updateProjectionMatrix();
+          this.renderer.setSize(width, height);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+      },
+
+      createHelper() {
+
+        // 创建坐标轴辅助线
+        const axesHelper = new THREE.AxesHelper(5);
+        this.scene.add(axesHelper);
+
+        
+      },
+
+
+      animate() {
+        this.controls.update();
+        this.renderer.render(this.scene, this.camera);
+        requestAnimationFrame(() => this.animate());
+      },
+
+      createControls() {
+        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+      },
+
+      init() {
+        this.createScene();
+        this.createCamera();
+        this.createGeometry();
+        this.createLight();
+        this.createRenderer();
+        this.createControls();
+        this.handleResize();
+        this.animate();
+        this.createHelper();
+      }
+    } as SceneManager;
+
+    // 启动应用
+    sceneManager.init();
+
+    // 清理函数
+    return () => {
+
+
+      if (mountRef.current && sceneManager.renderer.domElement) {
+        mountRef.current.removeChild(sceneManager.renderer.domElement);
+      }
+    };
+  }, []);
+
+
+  return <div ref={mountRef}></div>;
+};
+
+export default Test;
