@@ -16,7 +16,7 @@ import woodTexture from '../../../assets/textures/Wood_Ceiling_Coffers_003/Wood_
 import woodTexture1 from '../../../assets/textures/Wood_Ceiling_Coffers_003/image1.png';
 import { DragControls } from 'three/examples/jsm/Addons.js';
 
-
+// TODO: 数组的纹理顺序是: x正方向轴的面，x负方向轴的面，y正方向轴的面，y负方向轴的面，z正方向轴的面，z负方向轴的面.
 const Test = () => {
 
   const mountRef = useRef<HTMLDivElement>(null);

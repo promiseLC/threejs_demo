@@ -16,6 +16,7 @@ import HDR6 from '../../../assets/textures/rectangular/pine_attic_1k.hdr';
 import HDR7 from '../../../assets/textures/rectangular/creepy_bathroom_1k.hdr';
 import HDR8 from '../../../assets/textures/rectangular/industrial_workshop_foundry_1k.hdr';
 import HDR9 from '../../../assets/textures/rectangular/school_hall_1k.hdr';
+import toothMap from '../../../assets/textures/tooth/map.png';
 
 import woodTexture from '../../../assets/textures/Wood_Ceiling_Coffers_003/Wood_Ceiling_Coffers_003_basecolor.jpg';
 
@@ -82,20 +83,20 @@ const ObjView = () => {
 
     // 调整光照
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // 降低环境光强度
-    // scene.add(ambientLight);
+    scene.add(ambientLight);
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.2);
     directionalLight.position.set(0, 0, 0);
     directionalLight.target.position.set(1000, 0, 0);
-    // scene.add(directionalLight);
+    scene.add(directionalLight);
 
         const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.5);
     directionalLight.position.set(0 , 0, 0);
-    // scene.add(directionalLight1);
+    scene.add(directionalLight1);
 
           const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
       directionalLight.position.set(0, 0, -1000);
-    // scene.add(directionalLight2);
+    scene.add(directionalLight2);
     
 
 
@@ -109,8 +110,15 @@ const ObjView = () => {
     });
    
     
-    const baseColorTexture = new THREE.TextureLoader().load(woodTexture, (t) => {
+    const baseColorTexture = new THREE.TextureLoader().load(toothMap, (t) => {
       t.needsUpdate = true;
+      // t.colorSpace = THREE.SRGBColorSpace;
+    });
+
+
+     const baseColorTexture1 = new THREE.TextureLoader().load(woodTexture, (t) => {
+      t.needsUpdate = true;
+      t.colorSpace = THREE.SRGBColorSpace;
     });
   
 
@@ -220,39 +228,151 @@ const ObjView = () => {
     });
 
 
+    const asbValue = (a:number, b:number) => {
+      return Math.abs(Math.abs(a)-Math.abs(b));
+    }
+    
 
 
     // 创建OBJ加载器
     const loader = new OBJLoader();
     
    const material = new THREE.MeshPhysicalMaterial({
-    // roughnessMap: roughnessTexture1,
-     // envMap: hdrT,
-    //  vertexColors: true,
-    // envMapIntensity: 1,
+     // roughnessMap: roughnessTexture1,
+     clearcoat: 0.6,
+     reflectivity: 0.1,
+    //  envMap: hdrT4,
+    //  map: baseColorTexture1,
+     vertexColors: true,
+    envMapIntensity: 1,
     color: 0xffffee, // 陶瓷的基色（白色或浅灰ee
-    roughness: 0.1,  // 粗糙度（0 为光滑，1 为粗糙）
+    roughness: 0.4,  // 粗糙度（0 为光滑，1 为粗糙）
     metalness: 0.3,  // 金属感（0 为非金属，1 为金属）
     side: THREE.DoubleSide,
     bumpScale: 0.1, // 凹凸强度
     // map: baseColorTexture,
             });
-        
+
     
-Object.entries(toothFiles).forEach(([path]) => {
+       const material1 = new THREE.MeshPhysicalMaterial({
+     // roughnessMap: roughnessTexture1,
+     clearcoat: 0.6,
+     reflectivity: 0.1,
+    //  envMap: hdrT4,
+    //  map: baseColorTexture1,
+    //  vertexColors: true,
+    envMapIntensity: 1,
+    color: 0xCA706B, // 陶瓷的基色（白色或浅灰ee
+    roughness: 0.2,  // 粗糙度（0 为光滑，1 为粗糙）
+    metalness: 0.2,  // 金属感（0 为非金属，1 为金属）
+    side: THREE.DoubleSide,
+    bumpScale: 0.1, // 凹凸强度
+    // map: baseColorTexture,
+            });
+       
+            
+    
+Object.entries(toothFiles).forEach(([path],index) => {
    // 加载第一个牙齿（基础材质
     loader.load(
       path,
       (object) => {
-    // const gui = new dat.GUI();
+        // const gui = new dat.GUI();
+        
 
         object.traverse((child) => {
           
           if (child instanceof THREE.Mesh) {
 
 
+            const center =  new THREE.Box3().setFromObject(child).getCenter(new THREE.Vector3());
+            const min = new THREE.Box3().setFromObject(child).min;
+            const max = new THREE.Box3().setFromObject(child).max;
+
+            const all = max.distanceTo(min)/2;
+
+            if (index===0&&!path.includes('gum')) {
+              console.log(all);
+              
+            }
+          
             // 优化几何体
             if (child.geometry) {
+
+
+
+              // 拿到模型顶点信息,并根据xy坐标做颜色渐变 由黄色渐变为白色
+              
+              const positions = child.geometry.attributes.position;
+              const colors = new Float32Array(positions.count * 3);
+
+
+              // 根据z坐标做颜色渐变 由黄色渐变为白色
+
+
+
+
+
+              const color = new THREE.Color(0xF8C554);
+              const color1 = new THREE.Color(0xeeeeee);
+              // 将color渐变为白色
+
+
+              for (let i = 0; i < positions.count; i++) {
+                const x = positions.getX(i);
+                const y = positions.getY(i);
+                const z = positions.getZ(i);
+
+
+
+                const [cx, cy, cz] = [center.x, center.y, center.z];
+
+                const distance = center.distanceTo(new THREE.Vector3(x, y, z));
+                
+                const a = distance/all;
+
+                // 两个数最小值
+                const min = Math.max( (1-a)/10+0.7,0.8);
+
+
+                
+
+                const afterColor = new THREE.Color().copy(color).lerp(color1,min);
+                const afterColor1 = new THREE.Color().copy(color).lerp(color1,0.9);
+
+
+                
+
+                // if ( z + 1000 < mid + 1000 && z + 1000 >= cz + 1000 && i % 2 === 0) {
+                // colors[i * 3] = afterColor.r;
+                // colors[i * 3 + 1] = afterColor.g;
+                //   colors[i * 3 + 2] = afterColor.b;
+                //   console.log(1);
+                  
+                // } else {
+                //   colors[i * 3] = afterColor1.r;
+                // colors[i * 3 + 1] = afterColor1.g;
+                // colors[i * 3 + 2] = afterColor1.b;
+                // }
+
+                if (z+1000 > cz+1000) {
+                colors[i * 3] = afterColor.r;
+                colors[i * 3 + 1] = afterColor.g;
+                colors[i * 3 + 2] = afterColor.b;
+                } else if(z+1000 === cz+1000) {
+                      colors[i * 3] = afterColor.r;
+                colors[i * 3 + 1] = afterColor.g;
+                colors[i * 3 + 2] = afterColor.b;
+        }else {
+               colors[i * 3] = afterColor1.r;
+                colors[i * 3 + 1] = afterColor1.g;
+                colors[i * 3 + 2] = afterColor1.b;
+                }
+
+               
+              }
+              child.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
 
               
         child.geometry.deleteAttribute('normal');
@@ -261,11 +381,16 @@ Object.entries(toothFiles).forEach(([path]) => {
         /** (3) 计算平滑法线 */
               child.geometry.computeVertexNormals();
 
-              child.geometry.setAttribute('uv', child.geometry.attributes.position);
 
             }
             // 设置材质
-            child.material = material; 
+
+
+            if (path.includes('gum')) {
+              child.material = material1; 
+            }else{
+              child.material = material; 
+            }
 
           //      gui.add(child, 'position').onChange((value) => {
           //   console.log(value);
@@ -301,6 +426,7 @@ Object.entries(toothFiles).forEach(([path]) => {
     gui.add(material, 'metalness', 0, 1, 0.1);
    
     gui.add(material, 'bumpScale', 0, 1, 0.1);
+    gui.add(material, 'ior', 0, 1, 0.1);
     
 
     const envMapFolder = gui.addFolder('环境贴图');
