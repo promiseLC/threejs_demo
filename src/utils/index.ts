@@ -21,11 +21,8 @@ class Renderer {
 
     this.width = window.innerWidth;
     this.height = window.innerHeight;
-
     this.createScene();
-
     this.createCamera();
-
   }
 
   createScene() {
@@ -332,26 +329,58 @@ export function convertTo3DArray(flatVertices: string | any[]) {
   return vertices;
 }
 
+// TODO: 计算模型移动后的uv等问题,要先改变顶点信息,使用四元数或者矩阵还解决这个问题
 
+
+// 使用四元数计算
+/* 
+ const positions = geometry.attributes.position.array;
+ const worldPositions = [];
+ for (let i = 0; i < positions.length; i += 3) {
+   const vertex = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2]);
+   vertex.applyQuaternion(quaternion); // 应用四元数旋转
+   worldPositions.push(vertex.x, vertex.y, vertex.z);
+ } 
+   */
 
 // 生成球面UV
 export function generateSphereUVs(vertices: any, child: THREE.Mesh) {
-  const uvs = new Float32Array(vertices.length / 3 * 2);
-  const center = new THREE.Box3().setFromObject(child).getCenter(new THREE.Vector3());
+  const uvs = new Float32Array((vertices.length / 3) * 2);
 
+  // 计算中心点
+  const center = new THREE.Vector3();
+  const count = vertices.length / 3;
+
+  for (let i = 0; i < vertices.length; i += 3) {
+    center.x += vertices[i];
+    center.y += vertices[i + 1];
+    center.z += vertices[i + 2];
+  }
+  center.divideScalar(count);
+
+  // 计算 UV
   for (let i = 0; i < vertices.length; i += 3) {
     const x = vertices[i] - center.x;
     const y = vertices[i + 1] - center.y;
     const z = vertices[i + 2] - center.z;
 
-    // 将顶点坐标转换为球面坐标
     const radius = Math.sqrt(x * x + y * y + z * z);
-    const theta = Math.atan2(y, x); // 方位角
-    const phi = Math.acos(z / radius); // 极角
 
-    // 将球面坐标映射到 UV 坐标
-    const u = (theta + Math.PI) / (2 * Math.PI);
-    const v = phi / Math.PI;
+    if (radius < 1e-6) {
+      uvs[(i / 3) * 2] = 0.5; // 默认值
+      uvs[(i / 3) * 2 + 1] = 0.5; // 默认值
+      continue;
+    }
+
+    const nx = x / radius; // 归一化 x
+    const ny = y / radius; // 归一化 y
+    const nz = z / radius; // 归一化 z
+
+    const theta = Math.atan2(ny, nx); // 方位角
+    const phi = Math.acos(nz); // 极角
+
+    const u = (theta + Math.PI) / (2 * Math.PI); // 映射到 [0, 1]
+    const v = phi / Math.PI; // 映射到 [0, 1]
 
     uvs[(i / 3) * 2] = u;
     uvs[(i / 3) * 2 + 1] = v;
@@ -385,42 +414,131 @@ export function planeGenerateUVs(vertices: any, child: THREE.Mesh) {
 
 
 
-export function generateCylinderUVs(vertices: any, child: THREE.Mesh,isReverse:boolean = false) {
+export function generateCylinderUVsWithCaps(vertices: any, child: THREE.Mesh, isReverse: boolean = false) {
   // 获取顶点的最小和最大 Z 坐标
 
 
   let minZ = new THREE.Box3().setFromObject(child).min.z;
   let maxZ = new THREE.Box3().setFromObject(child).max.z;
 
-  for (let i = 0; i < vertices.length; i += 3) {
-    const z = vertices[i + 2];
-    minZ = Math.min(minZ, z);
-    maxZ = Math.max(maxZ, z);
-  }
+  const center = new THREE.Box3().setFromObject(child).getCenter(new THREE.Vector3());
+
 
   // 计算 UV 坐标
   const uvs = new Float32Array(vertices.length / 3 * 2);
 
   for (let i = 0; i < vertices.length; i += 3) {
-    const x = vertices[i];
-    const y = vertices[i + 1];
-    const z = vertices[i + 2];
+    const x = vertices[i] - center.x;
+    const y = vertices[i + 1] - center.y;
+    const z = vertices[i + 2] - center.z;
 
     // 计算高度（v）
     const v = (z - minZ) / (maxZ - minZ); // 范围 [0, 1]
 
     // 计算角度（u）
     const theta = Math.atan2(y, x); // 范围 [-π, π]
+
     const u = (theta + Math.PI) / (2 * Math.PI); // 范围 [0, 1]
 
-    if(isReverse) {
-      uvs[(i / 3) * 2] = 1-u;
-      uvs[(i / 3) * 2 + 1] = 1-v;
-    }else{
+    if (isReverse) {
+      uvs[(i / 3) * 2] = 1 - u;
+      uvs[(i / 3) * 2 + 1] = 1 - v;
+    } else {
       uvs[(i / 3) * 2] = u;
       uvs[(i / 3) * 2 + 1] = v;
     }
   }
 
+  return uvs;
+}
+
+// 新的uv计算
+export function generateCylinderUVs(vertices: Float32Array, child: THREE.Mesh, isReverse: boolean = false): Float32Array {
+
+
+  child.updateWorldMatrix(true, false);
+  const worldMatrix = child.matrixWorld;
+
+
+  // 获取圆柱体的包围盒
+  const boundingBox = new THREE.Box3().setFromObject(child);
+  const center = boundingBox.getCenter(new THREE.Vector3());
+
+  const worldBox = boundingBox.clone().applyMatrix4(worldMatrix);
+
+  const minZ = worldBox.min.z;
+  const maxZ = worldBox.max.z;
+  const minX = worldBox.min.x;
+  const maxX = worldBox.max.x;
+
+  // 计算 UV 坐标
+  const uvs = new Float32Array((vertices.length / 3) * 2);
+
+  for (let i = 0; i < vertices.length; i += 3) {
+    const x = vertices[i] - center.x;
+    const y = vertices[i + 1] - center.y;
+    const z = vertices[i + 2];
+
+    // 归一化顶点坐标（投影到单位圆柱体表面）
+    const radius = Math.sqrt(x * x + y * y);
+    const nx = x / radius;
+    const ny = y / radius;
+
+    // 计算高度（v）
+    const v = (z - minZ) / (maxZ - minZ); // 范围 [0, 1]
+
+    // 计算角度（u）
+    const theta = Math.atan2(ny, nx); // 范围 [-π, π]
+    const u1 = (theta + Math.PI) / (2 * Math.PI); // 范围 [0, 1]
+
+    // const u1 = (x - minX) / (maxX - minX);
+
+    // 处理 UV 反转
+    if (isReverse) {
+      uvs[(i / 3) * 2] = 1 - u1;
+      uvs[(i / 3) * 2 + 1] = 1 - v;
+    } else {
+      uvs[(i / 3) * 2] = u1;
+      uvs[(i / 3) * 2 + 1] = v;
+    }
+  }
+
+  return uvs;
+}
+
+
+
+
+export function generateUVs(geometry: any) {
+  // 计算包围盒
+  const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+
+
+  // 生成平面投影UV
+  const uvs = [];
+  const positions = geometry.attributes.position.array;
+  for (let i = 0; i < positions.length; i += 3) {
+    const x = (positions[i] - box.min.x) / size.x;
+    const y = (positions[i + 1] - box.min.y) / size.y;
+
+    // 将坐标原点移到中心（0.5, 0.5）
+    const centerX = x - 0.5;
+    const centerY = y - 0.5;
+
+    // 旋转90度
+    // 旋转矩阵：[cos(90°) -sin(90°)] = [0 -1]
+    //          [sin(90°)  cos(90°)]   [1  0]
+    const rotatedX = -centerY + 0.5;  // 旋转后移回原来的坐标系
+    const rotatedY = centerX + 0.5;
+
+
+    // if (isChange) {
+    // uvs.push(u1, u2);
+    // } else {
+    uvs.push(rotatedX, rotatedY);
+    // }
+  }
   return uvs;
 }

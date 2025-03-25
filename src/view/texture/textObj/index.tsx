@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import * as dat from 'dat.gui';
 // 导入/src/assets/tooth文件夹下所有文件
-const toothFiles = import.meta.glob('/src/assets/tooth/*.obj');
+const toothFiles = import.meta.glob('/src/assets/tooth1/*.obj');
 
 
 import toothMap from '../../../assets/textures/tooth/map.png';
@@ -19,7 +19,7 @@ import envMap from '../../../assets/textures/tooth/reflectMap.png';
 
 import woodTexture from '../../../assets/textures/Wood_Ceiling_Coffers_003/Wood_Ceiling_Coffers_003_basecolor.jpg';
 
-import { generateSphereUVs, convertTo3DArray, planeGenerateUVs, generateCylinderUVs, generateCylinderUVsWithCaps, generateUVs } from '../../../utils/index';
+import { generateSphereUVs, convertTo3DArray, planeGenerateUVs, generateCylinderUVs, generateCylinderUVsWithCaps ,generateUVs} from '../../../utils/index';
 
 
 
@@ -81,6 +81,8 @@ const ObjView = () => {
     const axes = new THREE.AxesHelper(5);
     scene.add(axes);
 
+   
+
 
 
     // 1. 创建PMREMGenerator
@@ -132,10 +134,10 @@ const ObjView = () => {
     const yayinBaseColorTexture = new THREE.TextureLoader().load(qipanMap, (t) => {
       t.needsUpdate = true;
       t.colorSpace = THREE.SRGBColorSpace;
-      t.wrapS = THREE.RepeatWrapping;
-      t.wrapT = THREE.RepeatWrapping;
+      t.wrapS = 1000;
+      t.wrapT = 1000;
       t.repeat.set(1, 1);
-      // t.center.set(0.5, 0.5);
+      t.center.set(0.5, 0.5);
     });
 
     const yayinNormalMap = new THREE.TextureLoader().load(yayinnormalMap, (t) => {
@@ -147,6 +149,22 @@ const ObjView = () => {
       t.needsUpdate = true;
       t.colorSpace = THREE.SRGBColorSpace;
     });
+
+
+     const material2 = new THREE.MeshBasicMaterial({ color: 0xffffff ,map:yayinBaseColorTexture});
+
+    // 写一个球加入场景
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(4, 32,32), material2);
+
+    const uv = generateUVs(sphere.geometry); 
+
+    
+    sphere.geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+
+
+    scene.add(sphere);
+
+
     const geometry = new THREE.BoxGeometry(10, 10, 10);
     const material1 = new THREE.MeshPhysicalMaterial({
       map: yayinBaseColorTexture,
@@ -156,7 +174,7 @@ const ObjView = () => {
       // 自发光
       // emissive: 0xCC1520,
       // emissiveIntensity: 1,
-      envMap: envMapT,
+      // envMap: envMapT,
       metalness: 0.1,
       // roughnessMap: yayinSpecularMap,
       roughness: 0,
@@ -178,12 +196,36 @@ const ObjView = () => {
     // 创建OBJ加载器
     const loader = new OBJLoader();
 
+    // 在材质定义之前添加shader代码
+    const uvShaderMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        time: { value: 0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        
+        void main() {
+          // 使用UV坐标创建渐变效果
+          vec3 color = vec3(vUv.x, vUv.y, 0.0);
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `
+    });
+
     const material = new THREE.MeshPhysicalMaterial({
       // roughnessMap: roughnessTexture1,
       envMap: envMapT,
       clearcoat: 0.6,
       reflectivity: 0.1,
-      // map: baseColorTexture,
+      map: baseColorTexture,
       specularColorMap: specularMapT,
       //  vertexColors: true,
       //  normalMap: normalMapT,
@@ -226,6 +268,7 @@ const ObjView = () => {
               if (path.includes('gum')) {
                 child.material = material1;
               } else {
+                // 使用新的shader材质
                 child.material = material;
               }
               // 设置材质
@@ -234,24 +277,20 @@ const ObjView = () => {
               //   console.log(value);
               //  });
 
-              // // 将模型通过矩阵偏移X5 以X轴旋转90度
-              // child.geometry.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(0, Math.PI / 2, 0)));
-              // child.geometry.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, 5));
-
               let uv: any;
               if (path.includes('gum')) {
-                uv = generateUVs(child.geometry);
-                //  uv = generateCylinderUVs(child.geometry.attributes.position.array,child);
-                //  uv = generateSphereUVs(child.geometry.attributes.position.array,child);
                 console.log(child);
                 
+                // uv = generateCylinderUVs(child.geometry.attributes.position.array, child);
+                //  uv = generateCylinderUVs(child.geometry.attributes.position.array,child);
+                 uv = generateUVs(child.geometry);
+
               // uv = planeGenerateUVs(child.geometry.attributes.position.array,child);
 
               } else {
                 //  uv = generateSphereUVs(child.geometry.attributes.position.array,child);
-                // uv = generateSphereUVs(child.geometry.attributes.position.array, child);
+                uv = generateCylinderUVs(child.geometry.attributes.position.array, child);
                 //  uv = planeGenerateUVs(child.geometry.attributes.position.array,child);
-                          uv = generateCylinderUVs(child.geometry.attributes.position.array, child);
 
               }
 
@@ -312,7 +351,7 @@ const ObjView = () => {
     }).name('旋转');
 
 
-    gui.add({ rotation: 0 }, 'rotation', 0, Math.PI * 2).onChange((value) => {
+    gui.add({ rotation: 0 }, 'rotation', 0, Math.PI * 2, 0.01).onChange((value) => {
 
       // 让贴图以x轴旋转
       yayinBaseColorTexture.rotation = value;

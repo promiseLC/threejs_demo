@@ -3,9 +3,10 @@ import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as dat from 'dat.gui';
 // 导入/src/assets/tooth文件夹下所有文件
-const toothFiles = import.meta.glob('/src/assets/tooth/*.obj');
+const toothFiles = import.meta.glob('/src/assets/tooth/*.glf');
 
 
 import toothMap from '../../../assets/textures/tooth/map.png';
@@ -19,7 +20,8 @@ import envMap from '../../../assets/textures/tooth/reflectMap.png';
 
 import woodTexture from '../../../assets/textures/Wood_Ceiling_Coffers_003/Wood_Ceiling_Coffers_003_basecolor.jpg';
 
-import { generateSphereUVs, convertTo3DArray, planeGenerateUVs, generateCylinderUVs, generateCylinderUVsWithCaps, generateUVs } from '../../../utils/index';
+import { generateSphereUVs, convertTo3DArray, planeGenerateUVs, generateCylinderUVs, generateCylinderUVsWithCaps } from '../../../utils/index';
+
 
 
 
@@ -129,13 +131,13 @@ const ObjView = () => {
     });
 
 
-    const yayinBaseColorTexture = new THREE.TextureLoader().load(qipanMap, (t) => {
+    const yayinBaseColorTexture = new THREE.TextureLoader().load(yayinMap, (t) => {
       t.needsUpdate = true;
       t.colorSpace = THREE.SRGBColorSpace;
       t.wrapS = THREE.RepeatWrapping;
       t.wrapT = THREE.RepeatWrapping;
       t.repeat.set(1, 1);
-      // t.center.set(0.5, 0.5);
+      t.center.set(0.5, 0.5);
     });
 
     const yayinNormalMap = new THREE.TextureLoader().load(yayinnormalMap, (t) => {
@@ -176,14 +178,14 @@ const ObjView = () => {
 
 
     // 创建OBJ加载器
-    const loader = new OBJLoader();
+    const loader = new GLTFLoader();
 
     const material = new THREE.MeshPhysicalMaterial({
       // roughnessMap: roughnessTexture1,
       envMap: envMapT,
       clearcoat: 0.6,
       reflectivity: 0.1,
-      // map: baseColorTexture,
+      map: baseColorTexture,
       specularColorMap: specularMapT,
       //  vertexColors: true,
       //  normalMap: normalMapT,
@@ -203,7 +205,10 @@ const ObjView = () => {
         (object) => {
           // const gui = new dat.GUI();
 
-          object.traverse((child) => {
+          console.log(object);
+          
+
+          object.scene.traverse((child) => {
 
 
             if (child instanceof THREE.Mesh) {
@@ -234,24 +239,18 @@ const ObjView = () => {
               //   console.log(value);
               //  });
 
-              // // 将模型通过矩阵偏移X5 以X轴旋转90度
-              // child.geometry.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(0, Math.PI / 2, 0)));
-              // child.geometry.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, 5));
-
               let uv: any;
               if (path.includes('gum')) {
-                uv = generateUVs(child.geometry);
+                // uv = generateCylinderUVs(child.geometry.attributes.position.array, child);
                 //  uv = generateCylinderUVs(child.geometry.attributes.position.array,child);
-                //  uv = generateSphereUVs(child.geometry.attributes.position.array,child);
-                console.log(child);
-                
+                 uv = generateCylinderUVs(child.geometry.attributes.position.array,child);
+
               // uv = planeGenerateUVs(child.geometry.attributes.position.array,child);
 
               } else {
                 //  uv = generateSphereUVs(child.geometry.attributes.position.array,child);
-                // uv = generateSphereUVs(child.geometry.attributes.position.array, child);
+                uv = generateCylinderUVs(child.geometry.attributes.position.array, child);
                 //  uv = planeGenerateUVs(child.geometry.attributes.position.array,child);
-                          uv = generateCylinderUVs(child.geometry.attributes.position.array, child);
 
               }
 
@@ -265,7 +264,7 @@ const ObjView = () => {
           });
 
           // if (!path.includes('gum')) {
-          scene.add(object);
+          scene.add(object.scene);
           // }
 
 
@@ -312,7 +311,7 @@ const ObjView = () => {
     }).name('旋转');
 
 
-    gui.add({ rotation: 0 }, 'rotation', 0, Math.PI * 2).onChange((value) => {
+    gui.add({ rotation: 0 }, 'rotation', 0, Math.PI * 2, 0.01).onChange((value) => {
 
       // 让贴图以x轴旋转
       yayinBaseColorTexture.rotation = value;

@@ -22,3 +22,7 @@ body {
   position: relative;
   overflow: auto;
 }
+
+.ant-layout-sider-children {
+  overflow: auto;
+}
